@@ -1,8 +1,10 @@
 package server
 
 import (
+	"fmt"
 	"net"
-	"strings"
+
+	"github.com/hahahehejun/IM-System/common"
 )
 
 type User struct {
@@ -63,15 +65,24 @@ func (this *User) SendMsg(msg string) {
 }
 
 func (this *User) DoMessage(msg string) {
-	if msg == "who" {
+	fmt.Println(msg)
+	command := common.Parse(msg)
+	if command == nil {
+		fmt.Println("json parse err")
+		return
+	}
+	if command.Type == 0 {
 		this.server.mapLock.Lock()
 		for _, user := range this.server.OnlineMap {
 			onlineMsg := "[" + user.Name + "] 在线...\n"
 			this.SendMsg(onlineMsg)
 		}
 		this.server.mapLock.Unlock()
-	} else if len(msg) > 7 && msg[:7] == "rename|" {
-		newName := strings.Split(msg, "|")[1]
+	} else if command.Type == 3 {
+		newName, has := command.Parameter["newName"]
+		if !has {
+			this.SendMsg("参数异常")
+		}
 		_, ok := this.server.OnlineMap[newName]
 		if ok {
 			this.SendMsg("该用户名已存在")
@@ -85,10 +96,10 @@ func (this *User) DoMessage(msg string) {
 			this.Name = newName
 			this.SendMsg("用户名更新成功")
 		}
-	} else if len(msg) > 4 && msg[:3] == "to|" {
-		remoteName := strings.Split(msg, "|")[1]
-		if remoteName == "" {
-			this.SendMsg("消息格式错误  实例：to|user|msg")
+	} else if command.Type == 2 {
+		remoteName, has := command.Parameter["toUser"]
+		if !has {
+			this.SendMsg("消息格式错误")
 			return
 		}
 		remoteUser, ok := this.server.OnlineMap[remoteName]
@@ -96,13 +107,20 @@ func (this *User) DoMessage(msg string) {
 			this.SendMsg("用户不存在")
 			return
 		}
-		content := strings.Split(msg, "|")[2]
-		if content == "" {
+		content, hasMsg := command.Parameter["chatMsg"]
+		if !hasMsg || content == "" {
 			this.SendMsg("消息为空")
 			return
 		}
-		remoteUser.SendMsg("[" + this.Name + "]:" + content)
+		remoteUser.SendMsg("[" + this.Name + "]: " + content)
+	} else if command.Type == 1 {
+		content, hasMsg := command.Parameter["chatMsg"]
+		if !hasMsg || content == "" {
+			this.SendMsg("消息为空")
+			return
+		}
+		this.server.BroadCast(this, content)
 	} else {
-		this.server.BroadCast(this, msg)
+		this.SendMsg("命令异常")
 	}
 }

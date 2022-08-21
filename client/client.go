@@ -6,6 +6,8 @@ import (
 	"io"
 	"net"
 	"os"
+
+	"github.com/hahahehejun/IM-System/common"
 )
 
 type Client struct {
@@ -34,12 +36,45 @@ func NewClient(serverIp string, serverPort int) *Client {
 }
 
 func (client *Client) selectUser() {
-	sendMsg := "who\n"
-	_, err := client.conn.Write([]byte(sendMsg))
+	command := &common.Command{
+		Type:      0,
+		Parameter: make(map[string]string),
+	}
+	msg := common.Build(command)
+	fmt.Println(msg)
+	_, err := client.conn.Write([]byte(msg + "\n"))
 	if err != nil {
 		fmt.Println("conn write err:", err)
 		return
 	}
+}
+
+func (client *Client) PublicChat() {
+	var chatMsg string
+	fmt.Println(">>>>请输入聊天内容 exit退出")
+	fmt.Scanln(&chatMsg)
+
+	for chatMsg != "exit" {
+		if len(chatMsg) > 0 {
+			command := &common.Command{
+				Type:      1,
+				Parameter: make(map[string]string),
+			}
+
+			command.Parameter["chatMsg"] = chatMsg + "\n"
+			msg := common.Build(command)
+
+			_, err := client.conn.Write([]byte(msg + "\n"))
+			if err != nil {
+				fmt.Println("conn write err:", err)
+				break
+			}
+		}
+		chatMsg = ""
+		fmt.Println(">>>>请输入聊天内容 exit退出")
+		fmt.Scanln(&chatMsg)
+	}
+
 }
 
 func (client *Client) PrivateChat() {
@@ -55,8 +90,14 @@ func (client *Client) PrivateChat() {
 		fmt.Scanln(&chatMsg)
 		for chatMsg != "exit" {
 			if len(chatMsg) > 0 {
-				sendMsg := "to|" + remoteName + "|" + chatMsg + "\n\n"
-				_, err := client.conn.Write([]byte(sendMsg))
+				command := &common.Command{
+					Type:      2,
+					Parameter: make(map[string]string),
+				}
+				command.Parameter["toUser"] = remoteName
+				command.Parameter["chatMsg"] = chatMsg + "\n\n"
+				msg := common.Build(command)
+				_, err := client.conn.Write([]byte(msg + "\n"))
 				if err != nil {
 					fmt.Println("conn write err:", err)
 					break
@@ -73,33 +114,19 @@ func (client *Client) PrivateChat() {
 
 }
 
-func (client *Client) PublicChat() {
-	var chatMsg string
-	fmt.Println(">>>>请输入聊天内容 exit退出")
-	fmt.Scanln(&chatMsg)
-
-	for chatMsg != "exit" {
-		if len(chatMsg) > 0 {
-			sendMsg := chatMsg + "\n"
-			_, err := client.conn.Write([]byte(sendMsg))
-			if err != nil {
-				fmt.Println("conn write err:", err)
-				break
-			}
-		}
-		chatMsg = ""
-		fmt.Println(">>>>请输入聊天内容 exit退出")
-		fmt.Scanln(&chatMsg)
-	}
-
-}
-
 func (client *Client) UpdateName() bool {
 	fmt.Println(">>>>请输入用户名：")
 	fmt.Scanln(&client.Name)
 
-	sendMsg := "rename|" + client.Name + "\n"
-	_, err := client.conn.Write([]byte(sendMsg))
+	command := &common.Command{
+		Type:      3,
+		Parameter: make(map[string]string),
+	}
+
+	command.Parameter["newName"] = client.Name
+	msg := common.Build(command)
+
+	_, err := client.conn.Write([]byte(msg + "\n"))
 	if err != nil {
 		fmt.Println("conn write err:", err)
 		return false
